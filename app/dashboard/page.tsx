@@ -28,12 +28,15 @@ export default function Dashboard() {
         </div>
         <p className="text-gray-400 mb-6">Welcome, {email}</p>
         <div className="grid grid-cols-2 gap-4">
-          <div className="bg-gray-900 p-6 rounded-2xl">
-            <h2 className="text-lg font-semibold mb-1">Games</h2>
-            <p className="text-gray-400 text-sm">Coming soon</p>
-          </div>
-          <div className="bg-gray-900 p-6 rounded-2xl">
+          <div
+            onClick={() => router.push('/social')}
+            className="bg-gray-900 p-6 rounded-2xl cursor-pointer hover:bg-gray-800"
+          >
             <h2 className="text-lg font-semibold mb-1">Social</h2>
+            <p className="text-gray-400 text-sm">Posts, polls, messages</p>
+          </div>
+          <div className="bg-gray-900 p-6 rounded-2xl opacity-50">
+            <h2 className="text-lg font-semibold mb-1">Games</h2>
             <p className="text-gray-400 text-sm">Coming soon</p>
           </div>
         </div>
