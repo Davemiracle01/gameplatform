@@ -29,7 +29,7 @@ export default function Dashboard() {
 
   const sections = [
     { label: 'General Chat', desc: 'Chat with everyone online', path: '/social', color: 'bg-indigo-900' },
-    { label: 'Friends & DMs', desc: 'Find friends, send messages', path: '/friends', color: 'bg-purple-900' },
+    { label: 'People', desc: 'Find and message anyone', path: '/friends', color: 'bg-purple-900' },
     { label: 'Anonymous Board', desc: '1 post per 24hrs, fully anonymous', path: '/anonymous', color: 'bg-gray-800' },
     { label: 'Games', desc: 'Coming soon', path: null, color: 'bg-gray-900 opacity-50' },
   ]
