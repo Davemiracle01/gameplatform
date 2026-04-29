@@ -15,27 +15,24 @@ export default function PeoplePage() {
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
-      if (!data.user) router.push('/login')
-      else {
-        setUserId(data.user.id)
-        loadUsers(data.user.id)
+      if (!data.user) { router.push('/login'); return }
 
-        const channel = supabase.channel('people-presence')
-          .on('presence', { event: 'sync' }, () => {
-            const state = channel.presenceState()
-            const ids = new Set(
-              Object.values(state).flat().map((p: any) => p.user_id)
-            )
-            setOnlineIds(ids)
-          })
-          .subscribe(async (status) => {
-            if (status === 'SUBSCRIBED') {
-              await channel.track({ user_id: data.user!.id })
-            }
-          })
+      setUserId(data.user.id)
+      loadUsers(data.user.id)
 
-        return () => { supabase.removeChannel(channel) }
-      }
+      const channel = supabase.channel('people-presence')
+        .on('presence', { event: 'sync' }, () => {
+          const state = channel.presenceState()
+          const ids = new Set(
+            Object.values(state).flat().map((p: any) => p.user_id)
+          )
+          setOnlineIds(ids)
+        })
+        .subscribe(async (status) => {
+          if (status === 'SUBSCRIBED') {
+            await channel.track({ user_id: data.user!.id })
+          }
+        })
     })
   }, [])
 
