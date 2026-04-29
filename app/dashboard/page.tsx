@@ -36,7 +36,7 @@ export default function Dashboard() {
     { label: 'Messages', desc: 'Your DM conversations', path: '/dm', color: 'bg-purple-900' },
     { label: 'People', desc: 'Find and message anyone', path: '/friends', color: 'bg-violet-900' },
     { label: 'Anonymous Board', desc: '1 post per 24hrs, fully anonymous', path: '/anonymous', color: 'bg-gray-800' },
-    { label: 'Games', desc: 'Coming soon', path: null, color: 'bg-gray-900 opacity-50' },
+    {{ label: 'Games', desc: 'Play Ludo and more', path: '/games', color: 'bg-gray-800' },
   ]
 
   return (
