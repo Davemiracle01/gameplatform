@@ -9,6 +9,7 @@ type Message = {
   content: string
   is_anonymous: boolean
   created_at: string
+  username?: string
 }
 
 export default function SocialPage() {
@@ -35,7 +36,7 @@ export default function SocialPage() {
         schema: 'public',
         table: 'messages'
       }, payload => {
-        setMessages(prev => [...prev, payload.new as Message])
+        fetchMessages()
       })
       .on('presence', { event: 'sync' }, () => {
         const state = channel.presenceState()
@@ -56,7 +57,7 @@ export default function SocialPage() {
 
   const fetchMessages = async () => {
     const { data } = await supabase
-      .from('messages')
+      .from('messages_with_profiles')
       .select('*')
       .order('created_at', { ascending: true })
       .limit(100)
@@ -96,7 +97,7 @@ export default function SocialPage() {
             <div className={`max-w-xs px-4 py-2 rounded-2xl text-sm ${msg.user_id === userId ? 'bg-indigo-600' : 'bg-gray-800'}`}>
               {msg.user_id !== userId && (
                 <p className="text-xs text-gray-400 mb-1">
-                  {msg.is_anonymous ? 'Anonymous' : `User ${msg.user_id.slice(0, 6)}`}
+                  {msg.is_anonymous ? 'Anonymous' : `@${msg.username || msg.user_id.slice(0, 6)}`}
                 </p>
               )}
               <p>{msg.content}</p>
