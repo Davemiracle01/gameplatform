@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 
@@ -13,41 +13,24 @@ export default function PeoplePage() {
   const [onlineIds, setOnlineIds] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
 
-  const loadUsers = useCallback(async (uid: string) => {
-    setLoading(true)
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('id, username, status, role')
-      .neq('id', uid)
-      .order('username')
-      .limit(50)
-    if (data) setUsers(data)
-    setLoading(false)
-  }, [])
-
-  const searchUsers = async () => {
-    if (!search.trim()) { loadUsers(userId); return }
-    setLoading(true)
-    const { data } = await supabase
-      .from('profiles')
-      .select('id, username, status, role')
-      .neq('id', userId)
-      .ilike('username', `%${search}%`)
-      .limit(20)
-    if (data) setUsers(data)
-    setLoading(false)
-  }
-
   useEffect(() => {
     let channel: any
 
-    supabase.auth.getUser().then(({ data }) => {
-      if (!data.user) { router.push('/login'); return }
+    const init = async () => {
+      const { data: authData } = await supabase.auth.getUser()
+      if (!authData.user) { router.push('/login'); return }
 
-      const uid = data.user.id
+      const uid = authData.user.id
       setUserId(uid)
 
-      loadUsers(uid)
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, username, status, role')
+        .order('username')
+        .limit(50)
+
+      if (data) setUsers(data.filter(u => u.id !== uid))
+      setLoading(false)
 
       channel = supabase.channel('people-presence')
         .on('presence', { event: 'sync' }, () => {
@@ -62,17 +45,28 @@ export default function PeoplePage() {
             await channel.track({ user_id: uid })
           }
         })
-    })
-
-    return () => {
-      if (channel) supabase.removeChannel(channel)
     }
-  }, [loadUsers])
+
+    init()
+    return () => { if (channel) supabase.removeChannel(channel) }
+  }, [])
+
+  const searchUsers = async () => {
+    if (!search.trim()) {
+      const { data } = await supabase.from('profiles').select('id, username, status, role').order('username').limit(50)
+      if (data) setUsers(data.filter(u => u.id !== userId))
+      return
+    }
+    const { data } = await supabase
+      .from('profiles')
+      .select('id, username, status, role')
+      .ilike('username', `%${search}%`)
+      .limit(20)
+    if (data) setUsers(data.filter(u => u.id !== userId))
+  }
 
   const sorted = [...users].sort((a, b) => {
-    const aOnline = onlineIds.has(a.id) ? 0 : 1
-    const bOnline = onlineIds.has(b.id) ? 0 : 1
-    return aOnline - bOnline
+    return (onlineIds.has(a.id) ? 0 : 1) - (onlineIds.has(b.id) ? 0 : 1)
   })
 
   return (
