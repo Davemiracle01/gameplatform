@@ -8,6 +8,7 @@ type Profile = {
   username: string
   status: string
   created_at: string
+  role?: string
 }
 
 export default function ProfilePage() {
@@ -18,8 +19,7 @@ export default function ProfilePage() {
   const [isOwnProfile, setIsOwnProfile] = useState(false)
   const [status, setStatus] = useState('')
   const [editingStatus, setEditingStatus] = useState(false)
-  const [requestSent, setRequestSent] = useState(false)
-  const [alreadyFriends, setAlreadyFriends] = useState(false)
+  const [isBlocked, setIsBlocked] = useState(false)
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -28,7 +28,7 @@ export default function ProfilePage() {
         setCurrentUserId(data.user.id)
         setIsOwnProfile(data.user.id === userId)
         loadProfile()
-        checkFriendStatus(data.user.id)
+        checkBlocked(data.user.id)
       }
     })
   }, [userId])
@@ -45,22 +45,14 @@ export default function ProfilePage() {
     }
   }
 
-  const checkFriendStatus = async (uid: string) => {
+  const checkBlocked = async (uid: string) => {
     const { data } = await supabase
-      .from('friend_requests')
-      .select('status')
-      .or(`and(sender_id.eq.${uid},receiver_id.eq.${userId}),and(sender_id.eq.${userId},receiver_id.eq.${uid})`)
+      .from('blocks')
+      .select('id')
+      .eq('blocker_id', uid)
+      .eq('blocked_id', userId)
       .single()
-    if (data?.status === 'accepted') setAlreadyFriends(true)
-    if (data?.status === 'pending') setRequestSent(true)
-  }
-
-  const sendRequest = async () => {
-    await supabase.from('friend_requests').insert({
-      sender_id: currentUserId,
-      receiver_id: userId
-    })
-    setRequestSent(true)
+    if (data) setIsBlocked(true)
   }
 
   const saveStatus = async () => {
@@ -68,57 +60,121 @@ export default function ProfilePage() {
     setEditingStatus(false)
   }
 
-  if (!profile) return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-white">Loading...</div>
+  const blockUser = async () => {
+    await supabase.from('blocks').insert({ blocker_id: currentUserId, blocked_id: userId })
+    setIsBlocked(true)
+  }
+
+  const unblockUser = async () => {
+    await supabase.from('blocks').delete().eq('blocker_id', currentUserId).eq('blocked_id', userId)
+    setIsBlocked(false)
+  }
+
+  if (!profile) return (
+    <div className="min-h-screen flex items-center justify-center" style={{ background: '#0a0a0f' }}>
+      <div className="text-gray-600 text-sm">Loading...</div>
+    </div>
+  )
+
+  const isAdmin = profile.role === 'admin'
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white p-4">
+    <div className="min-h-screen text-white p-4" style={{ background: 'linear-gradient(135deg, #0a0a0f 0%, #0f0f1a 100%)' }}>
       <div className="max-w-md mx-auto">
-        <button onClick={() => router.back()} className="text-gray-400 text-sm mb-6">← Back</button>
+        <button onClick={() => router.back()} className="text-gray-500 text-sm mb-6">← Back</button>
 
-        <div className="bg-gray-900 rounded-2xl p-6 text-center mb-4">
-          <div className="w-20 h-20 rounded-full bg-indigo-600 flex items-center justify-center text-3xl font-bold mx-auto mb-4">
-            {profile.username[0].toUpperCase()}
+        <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }} className="rounded-2xl p-6 text-center mb-4">
+          
+          <div className="relative inline-block mb-4">
+            <div
+              style={{ background: isAdmin ? 'linear-gradient(135deg, #7c3aed, #a855f7)' : 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
+              className="w-20 h-20 rounded-full flex items-center justify-center text-3xl font-bold mx-auto"
+            >
+              {profile.username[0].toUpperCase()}
+            </div>
+            {isAdmin && (
+              <div style={{ background: '#7c3aed', border: '2px solid #0a0a0f' }} className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center text-xs">
+                ✓
+              </div>
+            )}
           </div>
-          <h1 className="text-2xl font-bold mb-1">@{profile.username}</h1>
-          <p className="text-gray-500 text-xs mb-4">
+
+          <div className="flex items-center justify-center gap-2 mb-1">
+            <h1 className="text-2xl font-bold">@{profile.username}</h1>
+            {isAdmin && (
+              <span style={{ background: 'rgba(124,58,237,0.2)', border: '1px solid #7c3aed', color: '#a855f7' }} className="text-xs px-2 py-0.5 rounded-full font-medium">
+                ADMIN
+              </span>
+            )}
+          </div>
+
+          <p className="text-gray-600 text-xs mb-4">
             Joined {new Date(profile.created_at).toLocaleDateString()}
           </p>
 
           {editingStatus ? (
             <div className="mt-2">
               <input
-                className="w-full bg-gray-800 text-white p-2 rounded-lg outline-none text-sm text-center mb-2"
+                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
+                className="w-full text-white p-2 rounded-lg outline-none text-sm text-center mb-2"
                 placeholder="What's on your mind?"
                 value={status}
                 onChange={e => setStatus(e.target.value)}
                 maxLength={100}
               />
-              <button onClick={saveStatus} className="bg-indigo-600 px-4 py-1 rounded-lg text-sm">Save</button>
+              <button onClick={saveStatus} style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }} className="px-4 py-1 rounded-lg text-sm">Save</button>
             </div>
           ) : (
             <p
-              className="text-gray-400 text-sm italic cursor-pointer"
+              className={`text-sm italic ${status ? 'text-gray-400' : 'text-gray-700'} ${isOwnProfile ? 'cursor-pointer hover:text-gray-300' : ''}`}
               onClick={() => isOwnProfile && setEditingStatus(true)}
             >
-              {status || (isOwnProfile ? 'Tap to add a status...' : 'No status yet')}
+              {status || (isOwnProfile ? 'Tap to add a status...' : '')}
             </p>
           )}
         </div>
 
         {!isOwnProfile && (
+          <div className="flex gap-3">
+            {!isBlocked ? (
+              <>
+                <button
+                  onClick={() => router.push(`/dm/${userId}`)}
+                  style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
+                  className="flex-1 p-3 rounded-2xl font-semibold text-sm"
+                >
+                  Message
+                </button>
+                <button
+                  onClick={blockUser}
+                  style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: '#f87171' }}
+                  className="px-4 py-3 rounded-2xl text-sm font-semibold"
+                >
+                  Block
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={unblockUser}
+                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
+                className="flex-1 p-3 rounded-2xl text-sm text-gray-400"
+              >
+                Unblock
+              </button>
+            )}
+          </div>
+        )}
+
+        {isOwnProfile && (
           <button
-            onClick={sendRequest}
-            disabled={requestSent || alreadyFriends}
-            className={`w-full p-3 rounded-2xl font-semibold text-sm ${
-              alreadyFriends ? 'bg-green-800 text-green-300' :
-              requestSent ? 'bg-gray-700 text-gray-400' :
-              'bg-indigo-600 hover:bg-indigo-500 text-white'
-            }`}
+            onClick={() => router.push('/dashboard')}
+            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
+            className="w-full p-3 rounded-2xl text-sm text-gray-400"
           >
-            {alreadyFriends ? '✓ Friends' : requestSent ? 'Request Sent' : 'Add Friend'}
+            Back to Dashboard
           </button>
         )}
       </div>
     </div>
   )
-      }
+}
