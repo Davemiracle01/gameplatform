@@ -66,12 +66,14 @@ export default function SocialPage() {
 
   const sendMessage = async () => {
     if (!content.trim()) return
+    const msg = content
+    setContent('')
     await supabase.from('messages').insert({
-      content,
+      content: msg,
       is_anonymous: isAnon,
       user_id: userId
     })
-    setContent('')
+    await fetchMessages()
   }
 
   const handleKey = (e: React.KeyboardEvent) => {
