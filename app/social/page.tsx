@@ -35,7 +35,7 @@ export default function SocialPage() {
         event: 'INSERT',
         schema: 'public',
         table: 'messages'
-      }, payload => {
+      }, () => {
         fetchMessages()
       })
       .on('presence', { event: 'sync' }, () => {
@@ -83,50 +83,105 @@ export default function SocialPage() {
     }
   }
 
-  return (
-    <div className="min-h-screen bg-gray-950 text-white flex flex-col">
-      <div className="flex justify-between items-center p-4 border-b border-gray-800">
-        <div>
-          <h1 className="font-bold text-lg">General Chat</h1>
-          <p className="text-green-400 text-xs">{onlineCount} online</p>
-        </div>
-        <button onClick={() => router.push('/dashboard')} className="text-gray-400 text-sm">← Back</button>
-      </div>
+  const formatTime = (ts: string) => {
+    return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  }
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
-        {messages.map(msg => (
-          <div key={msg.id} className={`flex ${msg.user_id === userId ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-xs px-4 py-2 rounded-2xl text-sm ${msg.user_id === userId ? 'bg-indigo-600' : 'bg-gray-800'}`}>
-              {msg.user_id !== userId && (
-                <p className="text-xs text-gray-400 mb-1">
-                  {msg.is_anonymous ? 'Anonymous' : `@${msg.username || msg.user_id.slice(0, 6)}`}
-                </p>
-              )}
-              <p>{msg.content}</p>
+  return (
+    <div className="min-h-screen flex flex-col" style={{ background: 'linear-gradient(135deg, #0a0a0f 0%, #0f0f1a 100%)' }}>
+      {/* Header */}
+      <div style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid rgba(255,255,255,0.06)', backdropFilter: 'blur(20px)' }} className="flex justify-between items-center px-4 py-3">
+        <div className="flex items-center gap-3">
+          <button onClick={() => router.push('/dashboard')} className="text-gray-500 hover:text-white transition-colors text-sm">←</button>
+          <div>
+            <h1 className="font-semibold text-white text-sm tracking-wide">General</h1>
+            <div className="flex items-center gap-1">
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-400"></div>
+              <span className="text-emerald-400 text-xs">{onlineCount} online</span>
             </div>
           </div>
-        ))}
+        </div>
+        <div style={{ background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)' }} className="px-3 py-1 rounded-full">
+          <span className="text-indigo-400 text-xs font-medium">LIVE</span>
+        </div>
+      </div>
+
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+        {messages.map(msg => {
+          const isOwn = msg.user_id === userId
+          return (
+            <div key={msg.id} className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
+              <div className={`max-w-xs ${isOwn ? 'items-end' : 'items-start'} flex flex-col gap-1`}>
+                {!isOwn && (
+                  <span
+                    onClick={() => !msg.is_anonymous && router.push(`/profile/${msg.user_id}`)}
+                    className={`text-xs px-1 ${msg.is_anonymous ? 'text-gray-600' : 'text-indigo-400 cursor-pointer hover:text-indigo-300'}`}
+                  >
+                    {msg.is_anonymous ? 'Anonymous' : `@${msg.username || msg.user_id.slice(0, 6)}`}
+                  </span>
+                )}
+                <div
+                  style={isOwn ? {
+                    background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                    borderRadius: '18px 18px 4px 18px'
+                  } : {
+                    background: 'rgba(255,255,255,0.06)',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    borderRadius: '18px 18px 18px 4px'
+                  }}
+                  className="px-4 py-2.5"
+                >
+                  <p className="text-white text-sm leading-relaxed">{msg.content}</p>
+                </div>
+                <span className="text-gray-600 text-xs px-1">{formatTime(msg.created_at)}</span>
+              </div>
+            </div>
+          )
+        })}
         <div ref={bottomRef} />
       </div>
 
-      <div className="p-4 border-t border-gray-800">
+      {/* Input */}
+      <div style={{ background: 'rgba(255,255,255,0.02)', borderTop: '1px solid rgba(255,255,255,0.06)', backdropFilter: 'blur(20px)' }} className="px-4 py-3">
         <div className="flex items-center gap-2 mb-2">
-          <label className="flex items-center gap-2 text-xs text-gray-400">
-            <input type="checkbox" checked={isAnon} onChange={e => setIsAnon(e.target.checked)} />
-            Send anonymously
+          <label className="flex items-center gap-2 cursor-pointer">
+            <div
+              onClick={() => setIsAnon(!isAnon)}
+              style={{
+                width: '32px', height: '18px',
+                background: isAnon ? '#6366f1' : 'rgba(255,255,255,0.1)',
+                borderRadius: '9px',
+                transition: 'background 0.2s',
+                position: 'relative'
+              }}
+            >
+              <div style={{
+                width: '14px', height: '14px',
+                background: 'white',
+                borderRadius: '50%',
+                position: 'absolute',
+                top: '2px',
+                left: isAnon ? '16px' : '2px',
+                transition: 'left 0.2s'
+              }} />
+            </div>
+            <span className="text-gray-500 text-xs">Anonymous</span>
           </label>
         </div>
         <div className="flex gap-2">
           <input
-            className="flex-1 bg-gray-800 text-white px-4 py-2 rounded-xl outline-none text-sm"
-            placeholder="Type a message..."
+            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}
+            className="flex-1 text-white px-4 py-2.5 rounded-2xl outline-none text-sm placeholder-gray-600 focus:border-indigo-500 transition-colors"
+            placeholder="Say something..."
             value={content}
             onChange={e => setContent(e.target.value)}
             onKeyDown={handleKey}
           />
           <button
             onClick={sendMessage}
-            className="bg-indigo-600 hover:bg-indigo-500 px-4 py-2 rounded-xl text-sm font-semibold"
+            style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
+            className="px-4 py-2.5 rounded-2xl text-white text-sm font-semibold hover:opacity-90 transition-opacity"
           >
             Send
           </button>
