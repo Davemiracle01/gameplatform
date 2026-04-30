@@ -88,31 +88,52 @@ const START_POS: Record<Color, number> = {
 
 const SAFE_SPOTS = new Set([0, 8, 13, 21, 26, 34, 39, 47]);
 
-const CELL = 36;
+// CELL and BOARD are now dynamic — see useBoardSize() hook below
+const CELL = 36; // fallback / used by BoardSVG which gets size injected
 const BOARD = 15 * CELL;
 
 const ALL_COLORS: Color[] = ['red', 'green', 'blue', 'yellow'];
 const COLOR_LABELS: Record<Color, string> = { red: 'Red', green: 'Green', blue: 'Blue', yellow: 'Yellow' };
 const BOT_NAMES = ['Alien Alpha', 'Alien Beta', 'Alien Gamma'];
 
+// ─── Dynamic board sizing ─────────────────────────────────────────────────────
+
+function useBoardSize() {
+  const [cellSize, setCellSize] = React.useState(CELL);
+  React.useEffect(() => {
+    function update() {
+      // Leave ~16px padding on each side; board = 15 cells
+      const available = Math.min(window.innerWidth - 32, window.innerHeight * 0.72);
+      const size = Math.max(20, Math.floor(available / 15));
+      setCellSize(size);
+    }
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
+  return { cellSize, boardPx: cellSize * 15 };
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function getPosition(piece: Piece): [number, number] {
+function getPosition(piece: Piece, cellSize: number = CELL): [number, number] {
+  const S = cellSize;
+  const boardSize = 15 * S;
   if (piece.steps === -1) {
     const slots = HOME_SLOTS[piece.color];
     const idx = parseInt(piece.id.split('-')[1]);
     const [r, c] = slots[idx];
-    return [c * CELL + CELL / 2, r * CELL + CELL / 2];
+    return [c * S + S / 2, r * S + S / 2];
   }
-  if (piece.steps >= 57) return [BOARD / 2, BOARD / 2];
+  if (piece.steps >= 57) return [boardSize / 2, boardSize / 2];
   if (piece.steps >= 52) {
     const idx = piece.steps - 52;
     const [r, c] = HOME_PATH[piece.color][idx];
-    return [c * CELL + CELL / 2, r * CELL + CELL / 2];
+    return [c * S + S / 2, r * S + S / 2];
   }
   const trackIdx = (START_POS[piece.color] + piece.steps) % 52;
   const [r, c] = TRACK[trackIdx];
-  return [c * CELL + CELL / 2, r * CELL + CELL / 2];
+  return [c * S + S / 2, r * S + S / 2];
 }
 
 const PIPS: Record<number, [number, number][]> = {
@@ -145,8 +166,9 @@ function DiceFace({ value, spinning }: { value: number; spinning: boolean }) {
 
 // ─── Board SVG ───────────────────────────────────────────────────────────────
 
-function BoardSVG() {
-  const S = CELL;
+function BoardSVG({ cellSize = CELL }: { cellSize?: number }) {
+  const S = cellSize;
+  const boardSize = 15 * S;
   const cols: { color: Color; zone: [number,number,number,number] }[] = [
     { color: 'red',    zone: [0, 0, 6, 6] },
     { color: 'green',  zone: [0, 9, 6, 6] },
@@ -162,8 +184,8 @@ function BoardSVG() {
   };
 
   return (
-    <svg width={BOARD} height={BOARD} viewBox={`0 0 ${BOARD} ${BOARD}`} className="absolute inset-0">
-      <rect width={BOARD} height={BOARD} fill="#0d0d2b" rx="12"/>
+    <svg width={boardSize} height={boardSize} viewBox={`0 0 ${boardSize} ${boardSize}`} className="absolute inset-0">
+      <rect width={boardSize} height={boardSize} fill="#0d0d2b" rx="12"/>
       {cols.map(({ color, zone: [r, c, h, w] }) => (
         <rect key={color} x={c*S} y={r*S} width={w*S} height={h*S}
           fill={LIGHT_BG[color]} stroke={COLORS[color]} strokeWidth="2" rx="8"/>
@@ -199,9 +221,9 @@ function BoardSVG() {
         ))
       )}
       <polygon
-        points={`${BOARD/2},${BOARD/2-S*1.5} ${BOARD/2+S*0.5},${BOARD/2-S*0.3} ${BOARD/2+S*1.5},${BOARD/2-S*0.3} ${BOARD/2+S*0.8},${BOARD/2+S*0.5} ${BOARD/2+S},${BOARD/2+S*1.5} ${BOARD/2},${BOARD/2+S} ${BOARD/2-S},${BOARD/2+S*1.5} ${BOARD/2-S*0.8},${BOARD/2+S*0.5} ${BOARD/2-S*1.5},${BOARD/2-S*0.3} ${BOARD/2-S*0.5},${BOARD/2-S*0.3}`}
+        points={`${boardSize/2},${boardSize/2-S*1.5} ${boardSize/2+S*0.5},${boardSize/2-S*0.3} ${boardSize/2+S*1.5},${boardSize/2-S*0.3} ${boardSize/2+S*0.8},${boardSize/2+S*0.5} ${boardSize/2+S},${boardSize/2+S*1.5} ${boardSize/2},${boardSize/2+S} ${boardSize/2-S},${boardSize/2+S*1.5} ${boardSize/2-S*0.8},${boardSize/2+S*0.5} ${boardSize/2-S*1.5},${boardSize/2-S*0.3} ${boardSize/2-S*0.5},${boardSize/2-S*0.3}`}
         fill="none" stroke="#ffffff30" strokeWidth="1.5"/>
-      <text x={BOARD/2} y={BOARD/2+14} textAnchor="middle" fontSize="28" opacity="0.6">🌟</text>
+      <text x={boardSize/2} y={boardSize/2+14} textAnchor="middle" fontSize="28" opacity="0.6">🌟</text>
     </svg>
   );
 }
@@ -324,6 +346,11 @@ export default function SpaceLudo() {
   const [winner, setWinner] = useState<Player | null>(null);
   const [explosions, setExplosions] = useState<Explosion[]>([]);
   const [confetti, setConfetti] = useState<{x:number;y:number;c:string;id:number}[]>([]);
+  const [botRollTrigger, setBotRollTrigger] = useState(0);
+
+  const { cellSize, boardPx } = useBoardSize();
+  const cellSizeRef = useRef(cellSize);
+  useEffect(() => { cellSizeRef.current = cellSize; }, [cellSize]);
 
   const piecesRef = useRef<Piece[]>([]);
   const playersRef = useRef<Player[]>([]);
@@ -448,7 +475,7 @@ export default function SpaceLudo() {
         );
         captured.forEach(occ => {
           const occIdx = newPieces.findIndex(p => p.id === occ.id);
-          const [ex, ey] = getPosition(occ);
+          const [ex, ey] = getPosition(occ, cellSizeRef.current);
           const expId = Date.now() + Math.random();
           setExplosions(prev => [...prev, { x: ex, y: ey, id: expId }]);
           setTimeout(() => setExplosions(e => e.filter(ex => ex.id !== expId)), 700);
@@ -477,6 +504,7 @@ export default function SpaceLudo() {
     if (roll === 6) {
       setMessage(`${currentPlayer.name} rolled 6 — Roll again!`);
       isBotTurnRef.current = currentPlayer.isBot;
+      if (currentPlayer.isBot) setBotRollTrigger(t => t + 1);
     } else {
       nextTurn(currentPlayers, turnIdx);
     }
@@ -595,7 +623,7 @@ export default function SpaceLudo() {
     botTimeoutRef.current = setTimeout(botPlay, 500);
     return () => { if (botTimeoutRef.current) clearTimeout(botTimeoutRef.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentTurnIndex, gamePhase]);
+  }, [currentTurnIndex, botRollTrigger, gamePhase]);
 
   const resetGame = () => {
     isBotTurnRef.current = false;
@@ -760,7 +788,7 @@ export default function SpaceLudo() {
       {gamePhase === 'playing' && (
         <>
           {/* Top Bar */}
-          <div className="flex justify-between items-center px-5 py-3 border-b border-white/10 bg-black/50 backdrop-blur-xl">
+          <div className="flex justify-between items-center px-4 py-2 border-b border-white/10 bg-black/50 backdrop-blur-xl">
             <button onClick={resetGame} className="text-xl opacity-60 hover:opacity-100 transition-opacity">⬅</button>
             <div className="text-sm font-black tracking-[0.25em] opacity-80">SPACE LUDO</div>
             <div
@@ -776,124 +804,127 @@ export default function SpaceLudo() {
 
           {/* Message bar */}
           <div
-            className="text-center py-2 text-sm font-semibold tracking-wide px-4 min-h-[36px] transition-colors duration-300"
+            className="text-center py-1 text-xs font-semibold tracking-wide px-4 min-h-[28px] transition-colors duration-300"
             style={{ color: currentPlayer ? COLORS[currentPlayer.color] : '#fff' }}
           >
             {message}
           </div>
 
-          {/* Main layout */}
-          <div className="flex flex-col lg:flex-row items-center justify-center gap-6 px-4 pb-6">
-            {/* Board */}
-            <div className="flex flex-col items-center gap-4">
-              <div
-                className="relative rounded-2xl overflow-hidden shadow-2xl"
-                style={{
-                  width: BOARD, height: BOARD,
-                  border: '3px solid rgba(255,255,255,0.1)',
-                  boxShadow: '0 0 60px #3b82f622, 0 30px 80px #00000080',
-                  maxWidth: '96vw',
-                }}
-              >
-                <BoardSVG />
-                {pieces.map(piece => {
-                  const [px, py] = getPosition(piece);
-                  const isMovable = movablePieces.includes(piece.id);
-                  const finished = piece.steps >= 57;
-                  return (
-                    <div
-                      key={piece.id}
-                      className="absolute flex items-center justify-center cursor-pointer transition-all duration-75"
-                      style={{
-                        left: px, top: py,
-                        transform: 'translate(-50%, -50%)',
-                        zIndex: isMovable ? 20 : 10,
-                        pointerEvents: isMovable ? 'auto' : 'none',
-                      }}
-                      onClick={() => handlePieceClick(piece.id)}
-                    >
-                      {isMovable && (
-                        <div
-                          className="absolute rounded-full animate-ping"
-                          style={{ width: 44, height: 44, border: `3px solid ${COLORS[piece.color]}`, opacity: 0.5 }}
-                        />
-                      )}
-                      <div
-                        className="w-8 h-8 rounded-full flex items-center justify-center text-base border-2 shadow-lg transition-all duration-200"
-                        style={{
-                          backgroundColor: COLORS[piece.color],
-                          borderColor: isMovable ? '#fff' : '#000',
-                          boxShadow: isMovable ? GLOW[piece.color] : 'none',
-                          opacity: finished ? 0.4 : 1,
-                          transform: isMovable ? 'scale(1.2)' : 'scale(1)',
-                        }}
-                      >
-                        {finished ? '✓' : '👽'}
-                      </div>
-                    </div>
-                  );
-                })}
-                {explosions.map(ex => (
-                  <div
-                    key={ex.id}
-                    className="absolute pointer-events-none text-3xl animate-ping"
-                    style={{ left: ex.x, top: ex.y, transform: 'translate(-50%,-50%)', zIndex: 50 }}
-                  >💥</div>
-                ))}
-              </div>
+          {/* Board + overlaid player cards */}
+          <div className="flex flex-col items-center justify-start">
+            <div
+              className="relative rounded-2xl overflow-hidden shadow-2xl"
+              style={{
+                width: boardPx,
+                height: boardPx,
+                border: '2px solid rgba(255,255,255,0.1)',
+                boxShadow: '0 0 40px #3b82f622, 0 20px 60px #00000080',
+              }}
+            >
+              <BoardSVG cellSize={cellSize} />
 
-              {/* Dice */}
-              <div className="flex flex-col items-center gap-2">
-                <div
-                  onClick={rollDiceFunc}
-                  className={`cursor-pointer hover:scale-110 active:scale-95 transition-all duration-150 select-none ${rolling ? 'animate-spin' : ''}`}
-                  style={{ filter: 'drop-shadow(0 0 12px rgba(255,255,255,0.3))' }}
-                >
-                  <DiceFace value={dice} spinning={rolling} />
-                </div>
-                <p className="text-xs text-white/30 tracking-widest">
-                  {currentPlayer?.isBot ? 'Bot is playing...' : 'TAP DICE TO ROLL'}
-                </p>
-              </div>
-            </div>
-
-            {/* Sidebar */}
-            <div className="flex flex-row lg:flex-col gap-3 flex-wrap justify-center">
-              {players.map((p, i) => {
-                const pPieces = pieces.filter(pc => pc.playerId === p.id);
-                const finishedCount = pPieces.filter(pc => pc.steps >= 57).length;
-                const isActive = i === currentTurnIndex;
+              {/* Pieces */}
+              {pieces.map(piece => {
+                const [px, py] = getPosition(piece, cellSize);
+                const isMovable = movablePieces.includes(piece.id);
+                const finished = piece.steps >= 57;
+                const pieceSize = Math.max(18, cellSize * 0.72);
                 return (
                   <div
-                    key={p.id}
-                    className="rounded-2xl px-4 py-3 min-w-[130px] transition-all duration-300"
+                    key={piece.id}
+                    className="absolute flex items-center justify-center cursor-pointer transition-all duration-75"
                     style={{
-                      background: isActive
-                        ? `linear-gradient(135deg, ${COLORS[p.color]}33, ${COLORS[p.color]}11)`
-                        : '#ffffff08',
-                      border: `1.5px solid ${isActive ? COLORS[p.color] : '#ffffff15'}`,
-                      boxShadow: isActive ? `0 0 20px ${COLORS[p.color]}44` : 'none',
+                      left: px, top: py,
+                      transform: 'translate(-50%, -50%)',
+                      zIndex: isMovable ? 20 : 10,
+                      pointerEvents: isMovable ? 'auto' : 'none',
                     }}
+                    onClick={() => handlePieceClick(piece.id)}
                   >
-                    <div className="flex items-center gap-2 mb-2">
+                    {isMovable && (
                       <div
-                        className="w-3 h-3 rounded-full"
-                        style={{ backgroundColor: COLORS[p.color], boxShadow: isActive ? GLOW[p.color] : 'none' }}
+                        className="absolute rounded-full animate-ping"
+                        style={{ width: pieceSize * 1.5, height: pieceSize * 1.5, border: `2px solid ${COLORS[piece.color]}`, opacity: 0.5 }}
                       />
-                      <span className="text-sm font-bold truncate">{p.name}</span>
-                      {p.isBot && <span className="text-xs opacity-40">🤖</span>}
+                    )}
+                    <div
+                      className="rounded-full flex items-center justify-center border-2 shadow-lg transition-all duration-200"
+                      style={{
+                        width: pieceSize, height: pieceSize,
+                        fontSize: pieceSize * 0.55,
+                        backgroundColor: COLORS[piece.color],
+                        borderColor: isMovable ? '#fff' : '#000',
+                        boxShadow: isMovable ? GLOW[piece.color] : 'none',
+                        opacity: finished ? 0.4 : 1,
+                        transform: isMovable ? 'scale(1.2)' : 'scale(1)',
+                      }}
+                    >
+                      {finished ? '✓' : '👽'}
                     </div>
-                    <div className="flex gap-1">
-                      {pPieces.map((pc, j) => (
-                        <div key={j} className="text-sm" title={`Step ${pc.steps}`}>
-                          {pc.steps >= 57 ? '✅' : pc.steps === -1 ? '🏠' : '👽'}
-                        </div>
-                      ))}
-                    </div>
-                    <div className="text-xs mt-1 opacity-50">{finishedCount}/4 home</div>
                   </div>
                 );
               })}
+
+              {/* Explosions */}
+              {explosions.map(ex => (
+                <div
+                  key={ex.id}
+                  className="absolute pointer-events-none text-2xl animate-ping"
+                  style={{ left: ex.x, top: ex.y, transform: 'translate(-50%,-50%)', zIndex: 50 }}
+                >💥</div>
+              ))}
+
+              {/* Player cards overlaid in corners */}
+              {players.map((p, i) => {
+                const pPieces = pieces.filter(pc => pc.playerId === p.id);
+                const finishedCount = pPieces.filter(pc => pc.steps >= 57).length;
+                const pct = Math.round((finishedCount / 4) * 100);
+                const isActive = i === currentTurnIndex;
+                // corner positions: 0=top-left, 1=top-right, 2=bottom-left, 3=bottom-right
+                const corners = [
+                  { top: 4, left: 4 },
+                  { top: 4, right: 4 },
+                  { bottom: 4, left: 4 },
+                  { bottom: 4, right: 4 },
+                ];
+                const pos = corners[i] || corners[0];
+                return (
+                  <div
+                    key={p.id}
+                    className="absolute rounded-xl px-2 py-1 transition-all duration-300"
+                    style={{
+                      ...pos,
+                      background: isActive
+                        ? `${COLORS[p.color]}cc`
+                        : '#00000088',
+                      border: `1.5px solid ${isActive ? '#fff' : COLORS[p.color] + '88'}`,
+                      boxShadow: isActive ? `0 0 12px ${COLORS[p.color]}` : 'none',
+                      zIndex: 30,
+                      minWidth: cellSize * 2.8,
+                    }}
+                  >
+                    <div className="flex items-center gap-1">
+                      <span style={{ fontSize: cellSize * 0.45 }}>{p.isBot ? '🤖' : '👽'}</span>
+                      <span className="text-white font-black truncate" style={{ fontSize: cellSize * 0.38, maxWidth: cellSize * 2 }}>{p.name}</span>
+                    </div>
+                    <div className="text-white/80 font-bold" style={{ fontSize: cellSize * 0.34 }}>{pct}%</div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Dice row below board */}
+            <div className="flex flex-col items-center gap-1 mt-2">
+              <div
+                onClick={rollDiceFunc}
+                className={`cursor-pointer hover:scale-110 active:scale-95 transition-all duration-150 select-none ${rolling ? 'animate-spin' : ''}`}
+                style={{ filter: 'drop-shadow(0 0 12px rgba(255,255,255,0.3))' }}
+              >
+                <DiceFace value={dice} spinning={rolling} />
+              </div>
+              <p className="text-xs text-white/30 tracking-widest">
+                {currentPlayer?.isBot ? 'Bot is playing...' : 'TAP DICE TO ROLL'}
+              </p>
             </div>
           </div>
         </>
