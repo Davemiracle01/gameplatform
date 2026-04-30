@@ -3,21 +3,35 @@ import { useRouter } from 'next/navigation'
 
 export default function GamesPage() {
   const router = useRouter()
+  const games = [
+    { title:'Ludo', desc:'Play vs bot • Multiplayer coming soon', icon:'🎲', path:'/games/ludo' },
+    { title:'Tic Tac Toe', desc:'vs Bot or 2 players same phone', icon:'✕○', path:'/games/tictactoe' },
+  ]
   return (
-    <div className="min-h-screen text-white p-4" style={{ background: 'linear-gradient(135deg, #0a0a0f 0%, #0d0d1a 100%)' }}>
-      <div className="max-w-md mx-auto">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-xl font-bold">Games</h1>
-          <button onClick={() => router.push('/dashboard')} className="text-gray-500 text-sm">← Back</button>
+    <div style={{minHeight:'100vh',background:'linear-gradient(135deg,#06060f,#0d0a1a)',color:'white',padding:'16px 12px'}}>
+      <div style={{maxWidth:400,margin:'0 auto'}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
+          <h1 style={{fontSize:20,fontWeight:700}}>Games</h1>
+          <button onClick={()=>router.push('/dashboard')} style={{background:'none',border:'none',color:'#6b7280',fontSize:14,cursor:'pointer'}}>← Back</button>
         </div>
-        <div
-          onClick={() => router.push('/games/ludo')}
-          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
-          className="p-6 rounded-2xl cursor-pointer hover:border-indigo-500/50 transition-all"
-        >
-          <div className="text-4xl mb-3">🎲</div>
-          <h2 className="text-lg font-bold mb-1">Ludo</h2>
-          <p className="text-gray-500 text-sm">Play vs bot • Multiplayer coming soon</p>
+        <div style={{display:'flex',flexDirection:'column',gap:10}}>
+          {games.map(g=>(
+            <div key={g.path} onClick={()=>router.push(g.path)}
+              style={{
+                padding:20, borderRadius:20, cursor:'pointer',
+                background:'rgba(255,255,255,0.04)',
+                border:'1px solid rgba(255,255,255,0.08)',
+                display:'flex', alignItems:'center', gap:16,
+                transition:'border 0.2s',
+              }}
+            >
+              <div style={{fontSize:36,width:52,textAlign:'center'}}>{g.icon}</div>
+              <div>
+                <p style={{fontWeight:700,fontSize:16,marginBottom:4}}>{g.title}</p>
+                <p style={{color:'#6b7280',fontSize:12}}>{g.desc}</p>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>
