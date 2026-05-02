@@ -12,8 +12,17 @@ export default function Dashboard() {
   const [time, setTime] = useState(new Date())
   const [installPrompt, setInstallPrompt] = useState<any>(null)
   const [showInstall, setShowInstall] = useState(false)
+
   useEffect(() => {
     const tick = setInterval(() => setTime(new Date()), 1000)
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault()
+      setInstallPrompt(e)
+      setShowInstall(true)
+    })
+    window.addEventListener('appinstalled', () => setShowInstall(false))
+
     return () => clearInterval(tick)
   }, [])
 
