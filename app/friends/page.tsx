@@ -123,10 +123,7 @@ export default function PeoplePage() {
                 alignItems: 'center', 
                 gap: 12,
                 transition: 'all 0.2s ease',
-                ':hover': {
-                  background: 'rgba(255,255,255,0.08)',
-                  transform: 'translateX(4px)'
-                }
+                
               }}
               title={u.status || 'No status'}
             >
