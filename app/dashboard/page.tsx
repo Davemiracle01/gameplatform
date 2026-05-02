@@ -285,7 +285,30 @@ export default function Dashboard() {
           </div>
           <div style={{ marginLeft: 'auto', color: '#4b5563', fontSize: 18 }}>→</div>
         </div>
-
+{showInstall && (
+  <div
+    onClick={async () => {
+      if (!installPrompt) return
+      installPrompt.prompt()
+      const { outcome } = await installPrompt.userChoice
+      if (outcome === 'accepted') setShowInstall(false)
+    }}
+    style={{
+      marginTop: 16, padding: '14px 20px', borderRadius: 18,
+      background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+      display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer',
+      boxShadow: '0 4px 20px rgba(99,102,241,0.4)',
+    }}
+  >
+    <span style={{ fontSize: 24 }}>📲</span>
+    <div>
+      <p style={{ fontWeight: 700, fontSize: 14 }}>Install GamePlatform</p>
+      <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11 }}>Add to your home screen</p>
+    </div>
+    <div style={{ marginLeft: 'auto', color: 'rgba(255,255,255,0.5)' }}>→</div>
+  </div>
+)}
+        
         {/* Bottom brand */}
         <div style={{ textAlign: 'center', marginTop: 32, marginBottom: 8 }}>
           <p style={{ color: '#1f2937', fontSize: 10, letterSpacing: 3 }}>ASTATECH · GAMEPLATFORM</p>
