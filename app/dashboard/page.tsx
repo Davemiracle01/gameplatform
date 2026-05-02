@@ -153,15 +153,28 @@ export default function Dashboard() {
             {time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </div>
           <button
-            onClick={logout}
-            style={{
-              background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
-              borderRadius: 10, padding: '6px 14px', color: '#9ca3af',
-              fontSize: 12, cursor: 'pointer',
-            }}
-          >
-            Logout
-          </button>
+            <div style={{ display: 'flex', gap: 8 }}>
+  <button
+    onClick={() => router.push(`/profile/${userId}`)}
+    style={{
+      background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)',
+      borderRadius: 10, padding: '6px 14px', color: '#818cf8',
+      fontSize: 12, cursor: 'pointer',
+    }}
+  >
+    My Profile
+  </button>
+  <button
+    onClick={logout}
+    style={{
+      background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
+      borderRadius: 10, padding: '6px 14px', color: '#9ca3af',
+      fontSize: 12, cursor: 'pointer',
+    }}
+  >
+    Logout
+  </button>
+</div>
         </div>
 
         {/* Hero section */}
