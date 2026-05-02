@@ -92,7 +92,8 @@ export default function DMPage() {
         </div>
         <div>
           <div className="flex items-center gap-1">
-            <span className="font-semibold text-sm">@{friendName}</span>
+            <span className="font-semibold text-sm cursor-pointer hover:text-indigo-400" onClick={() => router.push(`/profile/${friendId}`)}>@{friendName}</span>
+            
             {friendRole === 'admin' && (
               <span style={{ background: 'rgba(124,58,237,0.2)', border: '1px solid #7c3aed', color: '#a855f7' }} className="text-xs px-1.5 py-0.5 rounded-full">ADMIN</span>
             )}
