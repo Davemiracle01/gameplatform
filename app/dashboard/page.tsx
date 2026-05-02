@@ -10,7 +10,8 @@ export default function Dashboard() {
   const [unreadGeneral, setUnreadGeneral] = useState(false)
   const [unreadDMs, setUnreadDMs] = useState(0)
   const [time, setTime] = useState(new Date())
-
+  const [installPrompt, setInstallPrompt] = useState<any>(null)
+  const [showInstall, setShowInstall] = useState(false)
   useEffect(() => {
     const tick = setInterval(() => setTime(new Date()), 1000)
     return () => clearInterval(tick)
