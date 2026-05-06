@@ -1,5 +1,6 @@
 'use client'
 
+import { Suspense } from 'react'
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
@@ -15,7 +16,6 @@ import {
 } from '@/lib/ludo-engine'
 import type { GameState, Player, Piece, PieceColor } from '@/lib/ludo-engine'
 
-// ── Colors ──────────────────────────────────────────────────────────────────
 const COLOR_HEX: Record<PieceColor, string> = {
   red: '#ef4444',
   blue: '#3b82f6',
@@ -23,28 +23,17 @@ const COLOR_HEX: Record<PieceColor, string> = {
   yellow: '#eab308',
 }
 
-// ── Board layout ─────────────────────────────────────────────────────────────
-// 52 squares on the outer ring, mapped to grid positions (col, row) on a 15x15 grid
 const RING: [number, number][] = [
-  // Bottom of left column going up (red start=0)
   [6,14],[6,13],[6,12],[6,11],[6,10],[6,9],
-  // Top-left area
   [5,8],[4,8],[3,8],[2,8],[1,8],[0,8],
-  // Top row going right (blue start=13)
   [0,6],[1,6],[2,6],[3,6],[4,6],[5,6],
-  // Right of top going down
   [6,5],[6,4],[6,3],[6,2],[6,1],[6,0],
-  // Top-right area (green start=26)
   [8,0],[8,1],[8,2],[8,3],[8,4],[8,5],
-  // Right column going down
   [9,6],[10,6],[11,6],[12,6],[13,6],[14,6],
-  // Bottom row going left (yellow start=39)
   [14,8],[13,8],[12,8],[11,8],[10,8],[9,8],
-  // Left of bottom going up
   [8,9],[8,10],[8,11],[8,12],[8,13],[8,14],
 ]
 
-// Home stretch columns (the 5 squares leading to center)
 const HOME_STRETCH: Record<PieceColor, [number, number][]> = {
   red:    [[7,13],[7,12],[7,11],[7,10],[7,9]],
   blue:   [[1,7],[2,7],[3,7],[4,7],[5,7]],
@@ -52,7 +41,6 @@ const HOME_STRETCH: Record<PieceColor, [number, number][]> = {
   yellow: [[13,7],[12,7],[11,7],[10,7],[9,7]],
 }
 
-// Home base corners (the 6x6 colored squares)
 const HOME_BASES: Record<PieceColor, { col: number; row: number }> = {
   red:    { col: 0, row: 9 },
   blue:   { col: 0, row: 0 },
@@ -60,9 +48,8 @@ const HOME_BASES: Record<PieceColor, { col: number; row: number }> = {
   yellow: { col: 9, row: 9 },
 }
 
-// Piece start positions inside home base
 const HOME_PIECE_OFFSETS = [
-  [1, 1], [3, 1], [1, 3], [3, 3],
+  [1,1],[3,1],[1,3],[3,3],
 ]
 
 function getPieceGridPos(piece: Piece): [number, number] | null {
@@ -72,18 +59,16 @@ function getPieceGridPos(piece: Piece): [number, number] | null {
     return [base.col + off[0], base.row + off[1]]
   }
   if (piece.status === 'finished') return null
-  // Home stretch: positions 52-55
   if (piece.position >= 52) {
     const stretch = HOME_STRETCH[piece.color]
     return stretch[piece.position - 52] ?? null
   }
-  // Shared ring
   const abs = absoluteSquare(piece)
   return RING[abs] ?? null
 }
 
-// ── Component ────────────────────────────────────────────────────────────────
-export default function LudoPlay() {
+// ── Inner game component (uses useSearchParams) ───────────────────────────
+function LudoPlayInner() {
   const router = useRouter()
   const params = useSearchParams()
   const roomCode = params.get('room') ?? ''
@@ -96,14 +81,12 @@ export default function LudoPlay() {
   const [diceDisplay, setDiceDisplay] = useState<number | null>(null)
   const [copied, setCopied] = useState(false)
 
-  // Load my identity
   useEffect(() => {
     const raw = sessionStorage.getItem('ludo_player')
     if (!raw) { router.push('/games/ludo'); return }
     setMe(JSON.parse(raw))
   }, [])
 
-  // Fetch game + subscribe to realtime
   useEffect(() => {
     if (!roomCode) return
 
@@ -115,7 +98,7 @@ export default function LudoPlay() {
         .single()
       if (data) {
         setGameRow(data)
-        if (data.game_state && data.game_state.phase) {
+        if (data.game_state?.phase) {
           setGameState(data.game_state as GameState)
         }
       }
@@ -142,7 +125,6 @@ export default function LudoPlay() {
     return () => { supabase.removeChannel(channel) }
   }, [roomCode])
 
-  // Update movable pieces when state changes
   useEffect(() => {
     if (!gameState || !me) return
     if (gameState.phase !== 'playing') return
@@ -181,7 +163,6 @@ export default function LudoPlay() {
     if (!gameState || !isMyTurn || gameState.diceRolled || rolling) return
     setRolling(true)
 
-    // Animate dice
     let count = 0
     const interval = setInterval(() => {
       setDiceDisplay(Math.ceil(Math.random() * 6))
@@ -195,10 +176,9 @@ export default function LudoPlay() {
       setRolling(false)
 
       const movablePieces = getMovablePieces(gameState, dice)
-      let newState = { ...gameState, diceValue: dice, diceRolled: true }
+      const newState = { ...gameState, diceValue: dice, diceRolled: true }
 
       if (movablePieces.length === 0) {
-        // No moves — auto skip after short delay
         setTimeout(async () => {
           const skipped = skipTurn({ ...newState })
           setDiceDisplay(null)
@@ -226,32 +206,25 @@ export default function LudoPlay() {
     setTimeout(() => setCopied(false), 2000)
   }
 
-  const CELL = 40 // px per grid cell
+  const CELL = 40
   const GRID = 15
 
   function renderBoard() {
     if (!gameState) return null
     const cells: React.ReactNode[] = []
 
-    // Background grid
     for (let r = 0; r < GRID; r++) {
       for (let c = 0; c < GRID; c++) {
         let bg = '#1a1a1a'
-
-        // Home base zones
-        if (r >= 9 && c < 6)  bg = '#3f1010' // red
-        if (r < 6  && c < 6)  bg = '#101040' // blue
-        if (r < 6  && c >= 9) bg = '#103010' // green
-        if (r >= 9 && c >= 9) bg = '#3f3f00' // yellow
-
-        // Center winning zone
+        if (r >= 9 && c < 6)  bg = '#3f1010'
+        if (r < 6  && c < 6)  bg = '#101040'
+        if (r < 6  && c >= 9) bg = '#103010'
+        if (r >= 9 && c >= 9) bg = '#3f3f00'
         if (r >= 6 && r <= 8 && c >= 6 && c <= 8) bg = '#2a2a2a'
 
-        // Safe squares
         const ringIdx = RING.findIndex(([rc, rr]) => rc === c && rr === r)
         if (ringIdx !== -1 && SAFE_SQUARES.has(ringIdx)) bg = '#2d2d1a'
 
-        // Home stretch coloring
         for (const [color, squares] of Object.entries(HOME_STRETCH)) {
           if (squares.some(([sc, sr]) => sc === c && sr === r)) {
             bg = color === 'red' ? '#3f1010'
@@ -276,7 +249,6 @@ export default function LudoPlay() {
       }
     }
 
-    // Pieces
     gameState.pieces.forEach((piece) => {
       const pos = getPieceGridPos(piece)
       if (!pos) return
@@ -309,8 +281,8 @@ export default function LudoPlay() {
     return cells
   }
 
-  // ── Waiting lobby ──────────────────────────────────────────────────────────
-  if (!gameState || gameState.phase === 'waiting' || !gameRow?.game_state?.phase) {
+  // Waiting lobby
+  if (!gameState || !gameRow?.game_state?.phase) {
     const players: Player[] = gameRow?.players ?? []
     const amHost = me && players.find(p => p.id === me.id)?.isHost
 
@@ -337,20 +309,17 @@ export default function LudoPlay() {
           <h2 style={{ fontSize: '1.5rem', marginBottom: 8 }}>Waiting for players</h2>
           <p style={{ color: '#666', marginBottom: 24 }}>Share this code with friends</p>
 
-          <div
-            onClick={copyCode}
-            style={{
-              background: '#111',
-              border: '1px solid #444',
-              borderRadius: 12,
-              padding: '16px 24px',
-              fontSize: '2rem',
-              letterSpacing: 8,
-              cursor: 'pointer',
-              marginBottom: 8,
-              userSelect: 'none',
-            }}
-          >
+          <div onClick={copyCode} style={{
+            background: '#111',
+            border: '1px solid #444',
+            borderRadius: 12,
+            padding: '16px 24px',
+            fontSize: '2rem',
+            letterSpacing: 8,
+            cursor: 'pointer',
+            marginBottom: 8,
+            userSelect: 'none',
+          }}>
             {roomCode}
           </div>
           <p style={{ color: '#555', fontSize: '0.8rem', marginBottom: 32 }}>
@@ -406,7 +375,7 @@ export default function LudoPlay() {
     )
   }
 
-  // ── Game over ──────────────────────────────────────────────────────────────
+  // Game over
   if (gameState.phase === 'finished') {
     const winner = gameState.players.find(p => p.id === gameState.winner)
     return (
@@ -446,7 +415,7 @@ export default function LudoPlay() {
     )
   }
 
-  // ── Main game ──────────────────────────────────────────────────────────────
+  // Main game
   const currentPlayer = getCurrentPlayer(gameState)
 
   return (
@@ -460,7 +429,6 @@ export default function LudoPlay() {
       fontFamily: 'Georgia, serif',
       color: '#fff',
     }}>
-      {/* Header */}
       <div style={{
         width: '100%',
         maxWidth: 640,
@@ -474,7 +442,6 @@ export default function LudoPlay() {
         <span style={{ color: '#555', fontSize: '0.85rem' }}>{me?.name}</span>
       </div>
 
-      {/* Turn indicator */}
       <div style={{
         background: '#1a1a1a',
         border: `2px solid ${COLOR_HEX[currentPlayer.color]}`,
@@ -486,7 +453,6 @@ export default function LudoPlay() {
         {isMyTurn ? '⭐ Your turn!' : `${currentPlayer.name}'s turn`}
       </div>
 
-      {/* Board */}
       <div style={{
         position: 'relative',
         width: GRID * CELL,
@@ -500,14 +466,12 @@ export default function LudoPlay() {
         {renderBoard()}
       </div>
 
-      {/* Last action */}
       {gameState.lastAction && (
         <p style={{ color: '#888', fontSize: '0.85rem', marginBottom: 12 }}>
           {gameState.lastAction}
         </p>
       )}
 
-      {/* Dice + Roll button */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
         <div style={{
           width: 60,
@@ -550,7 +514,6 @@ export default function LudoPlay() {
         )}
       </div>
 
-      {/* Players list */}
       <div style={{
         display: 'flex',
         gap: 10,
@@ -585,3 +548,25 @@ export default function LudoPlay() {
     </div>
   )
 }
+
+// ── Exported page with Suspense wrapper ───────────────────────────────────
+export default function LudoPlay() {
+  return (
+    <Suspense fallback={
+      <div style={{
+        minHeight: '100vh',
+        background: '#0f0f0f',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#fff',
+        fontFamily: 'Georgia, serif',
+        fontSize: '1.2rem',
+      }}>
+        Loading game...
+      </div>
+    }>
+      <LudoPlayInner />
+    </Suspense>
+  )
+  }
