@@ -1,130 +1,272 @@
-'use client';
+'use client'
 
-import React, { useState } from 'react';
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { supabase } from '@/lib/supabase'
+import { generateRoomCode, COLORS, COLOR_LABELS } from '@/lib/ludo-engine'
+import type { PieceColor } from '@/lib/ludo-engine'
 
-type Color = 'red' | 'green' | 'blue' | 'yellow';
+export default function LudoLobby() {
+  const router = useRouter()
+  const [name, setName] = useState('')
+  const [color, setColor] = useState<PieceColor>('red')
+  const [joinCode, setJoinCode] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [tab, setTab] = useState<'create' | 'join'>('create')
 
-export default function ClassicLudoLobby() {
-  const [mode, setMode] = useState<'menu' | 'create' | 'join'>('menu');
-  const [roomCode, setRoomCode] = useState('');
-  const [playerName, setPlayerName] = useState('Demon');
-  const [selectedColor, setSelectedColor] = useState<Color>('red');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  async function handleCreate() {
+    if (!name.trim()) return setError('Enter your name first')
+    setLoading(true)
+    setError('')
 
-  const generateRoomCode = () => {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    let code = '';
-    for (let i = 0; i < 6; i++) {
-      code += chars[Math.floor(Math.random() * chars.length)];
+    const roomCode = generateRoomCode()
+    const playerId = crypto.randomUUID()
+
+    const player = {
+      id: playerId,
+      name: name.trim(),
+      color,
+      isHost: true,
     }
-    return code;
-  };
 
-  const createRoom = async () => {
-    setLoading(true);
-    setError('');
-    
-    const newCode = generateRoomCode();
-    
-    // For now we'll just go to play page (we'll connect Supabase properly next)
-    window.location.href = `/games/ludo/play?room=\( {newCode}&name= \){encodeURIComponent(playerName)}&color=${selectedColor}&mode=create`;
-  };
+    const { error: dbError } = await supabase.from('games').insert({
+      room_code: roomCode,
+      status: 'waiting',
+      players: [player],
+      game_state: {},
+      max_players: 4,
+    })
 
-  const joinRoom = () => {
-    if (roomCode.length < 5) {
-      setError("Please enter a valid room code");
-      return;
+    if (dbError) {
+      setError('Failed to create room. Try again.')
+      setLoading(false)
+      return
     }
-    setLoading(true);
-    window.location.href = `/games/ludo/play?room=\( {roomCode.toUpperCase()}&name= \){encodeURIComponent(playerName)}&color=${selectedColor}&mode=join`;
-  };
+
+    // Save my identity in sessionStorage so the game page knows who I am
+    sessionStorage.setItem('ludo_player', JSON.stringify({ ...player, roomCode }))
+    router.push(`/games/ludo/play?room=${roomCode}`)
+  }
+
+  async function handleJoin() {
+    if (!name.trim()) return setError('Enter your name first')
+    if (!joinCode.trim()) return setError('Enter a room code')
+    setLoading(true)
+    setError('')
+
+    const code = joinCode.trim().toUpperCase()
+
+    const { data: game, error: fetchError } = await supabase
+      .from('games')
+      .select('*')
+      .eq('room_code', code)
+      .single()
+
+    if (fetchError || !game) {
+      setError('Room not found. Check the code.')
+      setLoading(false)
+      return
+    }
+
+    if (game.status !== 'waiting') {
+      setError('This game already started.')
+      setLoading(false)
+      return
+    }
+
+    const players = game.players as any[]
+
+    if (players.length >= game.max_players) {
+      setError('Room is full.')
+      setLoading(false)
+      return
+    }
+
+    // Pick a color not already taken
+    const takenColors = players.map((p: any) => p.color)
+    const availableColor = COLORS.find((c) => !takenColors.includes(c)) || color
+
+    const playerId = crypto.randomUUID()
+    const player = {
+      id: playerId,
+      name: name.trim(),
+      color: availableColor,
+      isHost: false,
+    }
+
+    const updatedPlayers = [...players, player]
+
+    const { error: updateError } = await supabase
+      .from('games')
+      .update({ players: updatedPlayers })
+      .eq('room_code', code)
+
+    if (updateError) {
+      setError('Failed to join. Try again.')
+      setLoading(false)
+      return
+    }
+
+    sessionStorage.setItem('ludo_player', JSON.stringify({ ...player, roomCode: code }))
+    router.push(`/games/ludo/play?room=${code}`)
+  }
 
   return (
-    <div className="min-h-screen bg-[#0f0a05] text-white flex items-center justify-center p-4 font-sans">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-12">
-          <h1 className="text-7xl font-black tracking-widest text-amber-400 mb-2">LUDO</h1>
-          <p className="text-2xl text-amber-300/80">Classic</p>
+    <div style={{
+      minHeight: '100vh',
+      background: '#0f0f0f',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontFamily: 'Georgia, serif',
+      padding: '20px',
+    }}>
+      <div style={{
+        background: '#1a1a1a',
+        border: '1px solid #333',
+        borderRadius: '16px',
+        padding: '40px',
+        width: '100%',
+        maxWidth: '420px',
+      }}>
+        <h1 style={{
+          color: '#fff',
+          fontSize: '2rem',
+          textAlign: 'center',
+          marginBottom: '8px',
+          letterSpacing: '2px',
+        }}>🎲 LUDO</h1>
+        <p style={{ color: '#666', textAlign: 'center', marginBottom: '32px' }}>
+          Play with friends online
+        </p>
+
+        {/* Tabs */}
+        <div style={{ display: 'flex', marginBottom: '24px', borderBottom: '1px solid #333' }}>
+          {(['create', 'join'] as const).map((t) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              style={{
+                flex: 1,
+                padding: '10px',
+                background: 'none',
+                border: 'none',
+                color: tab === t ? '#fff' : '#555',
+                borderBottom: tab === t ? '2px solid #fff' : '2px solid transparent',
+                cursor: 'pointer',
+                fontSize: '0.95rem',
+                textTransform: 'capitalize',
+                fontFamily: 'Georgia, serif',
+              }}
+            >
+              {t === 'create' ? 'Create Room' : 'Join Room'}
+            </button>
+          ))}
         </div>
 
-        {mode === 'menu' && (
-          <div className="space-y-4">
-            <button 
-              onClick={() => setMode('create')}
-              className="w-full py-6 text-xl font-bold bg-red-600 hover:bg-red-700 rounded-2xl transition"
-            >
-              Create New Game
-            </button>
-            <button 
-              onClick={() => setMode('join')}
-              className="w-full py-6 text-xl font-bold border-2 border-white/40 hover:bg-white/10 rounded-2xl transition"
-            >
-              Join Existing Game
-            </button>
-          </div>
-        )}
+        {/* Name input */}
+        <label style={{ color: '#aaa', fontSize: '0.85rem' }}>Your Name</label>
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Enter your name"
+          maxLength={20}
+          style={{
+            width: '100%',
+            padding: '12px',
+            marginTop: '6px',
+            marginBottom: '16px',
+            background: '#111',
+            border: '1px solid #333',
+            borderRadius: '8px',
+            color: '#fff',
+            fontSize: '1rem',
+            boxSizing: 'border-box',
+          }}
+        />
 
-        {(mode === 'create' || mode === 'join') && (
-          <div className="bg-[#1a140f] border border-amber-900/50 rounded-3xl p-8">
-            <button onClick={() => setMode('menu')} className="text-amber-400 mb-6">← Back</button>
-            
-            <input
-              type="text"
-              value={playerName}
-              onChange={(e) => setPlayerName(e.target.value)}
-              placeholder="Your Name"
-              className="w-full bg-black/60 border border-amber-900 rounded-xl px-5 py-4 text-lg mb-6"
-            />
-
-            <div className="mb-8">
-              <p className="text-amber-300/70 mb-3">Choose Color</p>
-              <div className="flex gap-4 justify-center">
-                {(['red', 'green', 'blue', 'yellow'] as Color[]).map(c => (
-                  <button
-                    key={c}
-                    onClick={() => setSelectedColor(c)}
-                    className={`w-16 h-16 rounded-2xl border-4 transition-all ${selectedColor === c ? 'border-white scale-110' : 'border-transparent'}`}
-                    style={{ backgroundColor: c === 'red' ? '#ef4444' : c === 'green' ? '#22c55e' : c === 'blue' ? '#3b82f6' : '#eab308' }}
-                  />
-                ))}
-              </div>
-            </div>
-
-            {mode === 'create' && (
-              <button
-                onClick={createRoom}
-                disabled={loading || !playerName.trim()}
-                className="w-full py-5 bg-green-600 hover:bg-green-700 rounded-2xl text-xl font-bold disabled:opacity-50"
-              >
-                {loading ? 'Creating...' : 'Create Room'}
-              </button>
-            )}
-
-            {mode === 'join' && (
-              <>
-                <input
-                  type="text"
-                  value={roomCode}
-                  onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
-                  placeholder="ROOM CODE"
-                  maxLength={6}
-                  className="w-full text-center text-3xl tracking-[8px] bg-black/60 border border-amber-900 rounded-xl px-5 py-6 mb-6"
-                />
+        {/* Color picker — only for create */}
+        {tab === 'create' && (
+          <>
+            <label style={{ color: '#aaa', fontSize: '0.85rem' }}>Pick Your Color</label>
+            <div style={{ display: 'flex', gap: '10px', marginTop: '8px', marginBottom: '20px' }}>
+              {COLORS.map((c) => (
                 <button
-                  onClick={joinRoom}
-                  disabled={loading || roomCode.length < 5}
-                  className="w-full py-5 bg-blue-600 hover:bg-blue-700 rounded-2xl text-xl font-bold disabled:opacity-50"
+                  key={c}
+                  onClick={() => setColor(c)}
+                  style={{
+                    flex: 1,
+                    padding: '10px 4px',
+                    borderRadius: '8px',
+                    border: color === c ? '2px solid #fff' : '2px solid transparent',
+                    background: c,
+                    color: c === 'yellow' ? '#000' : '#fff',
+                    cursor: 'pointer',
+                    fontSize: '0.7rem',
+                    fontWeight: 'bold',
+                  }}
                 >
-                  Join Game
+                  {c.toUpperCase()}
                 </button>
-              </>
-            )}
-
-            {error && <p className="text-red-500 text-center mt-4">{error}</p>}
-          </div>
+              ))}
+            </div>
+          </>
         )}
+
+        {/* Join code input */}
+        {tab === 'join' && (
+          <>
+            <label style={{ color: '#aaa', fontSize: '0.85rem' }}>Room Code</label>
+            <input
+              value={joinCode}
+              onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+              placeholder="e.g. AB12CD"
+              maxLength={6}
+              style={{
+                width: '100%',
+                padding: '12px',
+                marginTop: '6px',
+                marginBottom: '16px',
+                background: '#111',
+                border: '1px solid #333',
+                borderRadius: '8px',
+                color: '#fff',
+                fontSize: '1.2rem',
+                letterSpacing: '4px',
+                textAlign: 'center',
+                boxSizing: 'border-box',
+              }}
+            />
+          </>
+        )}
+
+        {error && (
+          <p style={{ color: '#ff4444', fontSize: '0.85rem', marginBottom: '12px' }}>
+            {error}
+          </p>
+        )}
+
+        <button
+          onClick={tab === 'create' ? handleCreate : handleJoin}
+          disabled={loading}
+          style={{
+            width: '100%',
+            padding: '14px',
+            background: loading ? '#333' : '#fff',
+            color: '#000',
+            border: 'none',
+            borderRadius: '8px',
+            fontSize: '1rem',
+            fontWeight: 'bold',
+            cursor: loading ? 'not-allowed' : 'pointer',
+            fontFamily: 'Georgia, serif',
+            letterSpacing: '1px',
+          }}
+        >
+          {loading ? 'Loading...' : tab === 'create' ? 'Create Room' : 'Join Room'}
+        </button>
       </div>
     </div>
-  );
-}
+  )
+        }
