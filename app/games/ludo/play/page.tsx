@@ -74,3 +74,98 @@ function RealisticDice({ value, onRoll, isRolling }: {
     </div>
   );
            }
+export default function ClassicLudoPlay() {
+  const searchParams = useSearchParams();
+  const roomCode = searchParams.get('room') || '';
+  const playerName = searchParams.get('name') || 'Demon';
+  const playerColor = (searchParams.get('color') as Color) || 'red';
+
+  const [players] = useState([
+    { id: 0, name: playerName, color: playerColor },
+    { id: 1, name: "Player 2", color: 'green' as Color },
+    { id: 2, name: "Player 3", color: 'blue' as Color },
+    { id: 3, name: "Player 4", color: 'yellow' as Color },
+  ]);
+
+  const [pieces, setPieces] = useState<any[]>([]);
+  const [currentTurnIndex, setCurrentTurnIndex] = useState(0);
+  const [dice, setDice] = useState(1);
+  const [isRolling, setIsRolling] = useState(false);
+
+  // Initialize pieces
+  useEffect(() => {
+    const initial: any[] = [];
+    players.forEach(p => {
+      for (let i = 0; i < 4; i++) {
+        initial.push({
+          id: `\( {p.color}- \){i}`,
+          playerId: p.id,
+          color: p.color,
+          steps: -1
+        });
+      }
+    });
+    setPieces(initial);
+  }, [players]);
+
+  const rollDice = async () => {
+    if (isRolling) return;
+
+    setIsRolling(true);
+    for (let i = 0; i < 12; i++) {
+      setDice(Math.floor(Math.random() * 6) + 1);
+      await new Promise(r => setTimeout(r, 55));
+    }
+    const final = Math.floor(Math.random() * 6) + 1;
+    setDice(final);
+    setIsRolling(false);
+  };
+
+  return (
+    <div className="min-h-screen bg-[#0a0703] text-white pb-12">
+      {/* Header */}
+      <div className="sticky top-0 bg-black/90 border-b border-amber-900 p-4 z-50">
+        <div className="flex justify-between items-center">
+          <h1 className="text-4xl font-black text-amber-400 tracking-wider">LUDO</h1>
+          <div>
+            <p className="text-xs text-amber-300/70">ROOM CODE</p>
+            <p className="font-mono text-lg text-amber-400">{roomCode}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Dice */}
+      <div className="flex justify-center mt-10">
+        <RealisticDice value={dice} onRoll={rollDice} isRolling={isRolling} />
+      </div>
+
+      <p className="text-center mt-3 text-amber-300/70">
+        {isRolling ? "Rolling the dice..." : "Tap dice to roll"}
+      </p>
+
+      {/* Board Placeholder */}
+      <div className="flex justify-center mt-8 px-4">
+        <div className="relative w-full max-w-[420px] aspect-square border-8 border-amber-900 rounded-3xl bg-[#1a140f] flex items-center justify-center overflow-hidden">
+          <p className="text-amber-400/40 text-center text-lg">
+            Full Board + Pieces<br />
+            will be added in next step
+          </p>
+        </div>
+      </div>
+
+      {/* Players */}
+      <div className="px-6 mt-10">
+        <p className="text-amber-300 mb-4 font-bold">PLAYERS IN ROOM</p>
+        {players.map((p, i) => (
+          <div key={i} className={`flex items-center gap-4 p-4 rounded-2xl mb-3 ${i === currentTurnIndex ? 'bg-amber-400/10 border border-amber-400' : 'bg-black/40'}`}>
+            <div className="w-10 h-10 rounded-full" style={{ backgroundColor: COLORS[p.color] }} />
+            <div>
+              <p className="font-medium">{p.name}</p>
+              {i === 0 && <p className="text-xs text-amber-400">(You)</p>}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
