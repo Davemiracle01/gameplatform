@@ -5,7 +5,7 @@ export interface Piece {
   id: string
   color: PieceColor
   index: number
-  position: number // -1=home, 0-51=ring, 52-56=home stretch, 57=done
+  position: number
   status: PieceStatus
 }
 
@@ -43,15 +43,10 @@ export const COLOR_DARK: Record<PieceColor, string> = {
   yellow: '#451a03',
 }
 
-// Where each color enters the board (index into shared 52-ring)
 export const START_SQUARES: Record<PieceColor, number> = {
-  red: 0,
-  blue: 13,
-  green: 26,
-  yellow: 39,
+  red: 0, blue: 13, green: 26, yellow: 39,
 }
 
-// Safe squares on the ring (0-indexed)
 export const SAFE_SQUARES = new Set([0, 8, 13, 21, 26, 34, 39, 47])
 
 export function generateRoomCode(): string {
@@ -62,14 +57,23 @@ export function createInitialState(players: Player[]): GameState {
   const pieces: Piece[] = []
   players.forEach((p) => {
     for (let i = 0; i < 4; i++) {
-      pieces.push({ id: `${p.color}-${i}`, color: p.color, index: i, position: -1, status: 'home' })
+      pieces.push({
+        id: `${p.color}-${i}`,
+        color: p.color,
+        index: i,
+        position: -1,
+        status: 'home',
+      })
     }
   })
   return {
     players, pieces,
     currentPlayerIndex: 0,
-    diceValue: null, diceRolled: false,
-    phase: 'playing', winner: null, lastAction: null,
+    diceValue: null,
+    diceRolled: false,
+    phase: 'playing',
+    winner: null,
+    lastAction: null,
   }
 }
 
@@ -86,10 +90,7 @@ export function getMovablePieces(state: GameState, dice: number): string[] {
   const player = getCurrentPlayer(state)
   return state.pieces
     .filter((p) => p.color === player.color && p.status !== 'finished')
-    .filter((p) => {
-      if (p.status === 'home') return dice === 6
-      return p.position + dice <= 56
-    })
+    .filter((p) => p.status === 'home' ? dice === 6 : p.position + dice <= 56)
     .map((p) => p.id)
 }
 
@@ -119,12 +120,15 @@ export function applyMove(state: GameState, pieceId: string, dice: number): Game
     if (!SAFE_SQUARES.has(abs)) {
       for (let i = 0; i < pieces.length; i++) {
         const other = pieces[i]
-        if (other.color !== piece.color && other.status === 'active' && other.position < 52) {
-          if (absoluteSquare(other) === abs) {
-            pieces[i] = { ...other, position: -1, status: 'home' }
-            captured = true
-            extraTurn = true
-          }
+        if (
+          other.color !== piece.color &&
+          other.status === 'active' &&
+          other.position < 52 &&
+          absoluteSquare(other) === abs
+        ) {
+          pieces[i] = { ...other, position: -1, status: 'home' }
+          captured = true
+          extraTurn = true
         }
       }
     }
@@ -136,8 +140,7 @@ export function applyMove(state: GameState, pieceId: string, dice: number): Game
     ? state.currentPlayerIndex
     : (state.currentPlayerIndex + 1) % state.players.length
 
-  const action = winner
-    ? `🏆 ${player.name} wins the game!`
+  const action = winner ? `🏆 ${player.name} wins!`
     : captured ? `${player.name} captured a piece! 🎯`
     : piece.status === 'finished' ? `${player.name} got a piece home! ✅`
     : extraTurn ? `${player.name} rolled ${dice} — extra turn! 🎲`
@@ -146,9 +149,11 @@ export function applyMove(state: GameState, pieceId: string, dice: number): Game
   return {
     ...state, pieces,
     currentPlayerIndex: nextIndex,
-    diceValue: dice, diceRolled: true,
+    diceValue: dice,
+    diceRolled: true,
     phase: winner ? 'finished' : 'playing',
-    winner, lastAction: action,
+    winner,
+    lastAction: action,
   }
 }
 
@@ -157,7 +162,8 @@ export function skipTurn(state: GameState): GameState {
   return {
     ...state,
     currentPlayerIndex: (state.currentPlayerIndex + 1) % state.players.length,
-    diceRolled: false, diceValue: null,
+    diceRolled: false,
+    diceValue: null,
     lastAction: `${player.name} has no moves — skipped`,
   }
 }
