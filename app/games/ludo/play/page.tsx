@@ -584,4 +584,4 @@ export default function LudoPlay() {
       </div>
     </div>
   )
-    }
+}
